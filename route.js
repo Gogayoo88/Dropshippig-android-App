@@ -1,24 +1,72 @@
-export async function POST(req){
- const {worker,query}=await req.json();
- const prompts={
-  productos:'Analiza categorías de productos, demanda, margen, competencia, logística y señales de tendencia.',
-  proveedores:'Define cómo investigar proveedores, costes, plazos, devoluciones, reputación y envío a la UE.',
-  competencia:'Crea un análisis de competencia: precio, oferta, diferenciación, anuncios y oportunidad.',
-  marketing:'Crea ángulos de marketing, cliente ideal, oferta, contenido y pruebas publicitarias.',
-  manager:'Actúa como manager: prioriza oportunidades, riesgos y próximos pasos.',
-  secretaria:'Organiza la investigación en tareas, prioridades y checklist.'
- };
- const apiKey=process.env.OPENAI_API_KEY;
- if(!apiKey) return Response.json({result:`MODO DEMO\n\nTrabajador: ${worker}\nConsulta: ${query||'Sin consulta específica'}\n\n${prompts[worker]}\n\nPara obtener investigación AI real desde Internet, configura OPENAI_API_KEY en las variables de entorno de Vercel.`});
- try{
-  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'Authorization':`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({
-   model:'gpt-5-mini',
-   tools:[{type:'web_search_preview'}],
-   input:`Eres un trabajador especializado de una aplicación de dropshipping. ${prompts[worker]} El usuario pide: ${query}. Responde en español, con datos verificables, enlaces/fuentes cuando estén disponibles y separa hechos de recomendaciones.`
-  })});
-  const d=await r.json();
-  if(!r.ok) return Response.json({error:d?.error?.message||'Error de API'},{status:500});
-  const text=(d.output||[]).flatMap(x=>x.content||[]).map(x=>x.text||'').filter(Boolean).join('\n');
-  return Response.json({result:text||'La API respondió sin texto.'});
- }catch(e){return Response.json({error:'Error conectando con el servicio de investigación.'},{status:500});}
+import { NextResponse } from 'next/server';
+
+const workerPrompts = {
+  produse: 'Ești cercetător de produse pentru dropshipping. Caută pe web informații actuale despre produse, cerere, tendințe, prețuri și semnale de interes. Prioritizează Spania și UE când utilizatorul nu precizează altă piață. Nu inventa cifre. Separă clar faptele găsite de estimări.',
+  furnizori: 'Ești cercetător de furnizori pentru dropshipping. Caută pe web furnizori, timpi de livrare, prețuri publice, locații, reputație și condiții relevante pentru Spania și UE. Nu pretinde că ai contactat furnizori dacă doar ai cercetat informația.',
+  concurenta: 'Ești analist de concurență e-commerce. Caută pe web magazine, listări, prețuri publice, poziționare și semnale de concurență. Fii atent la data informației și nu inventa vânzări private.',
+  marketing: 'Ești specialist marketing pentru dropshipping. Cercetează pe web tendințe și exemple publice relevante, apoi propune un plan de promovare realist. Distinge informațiile găsite de recomandările tale.',
+  manager: 'Ești managerul echipei AI. Folosește cercetare web pentru a verifica informațiile importante și transformă rezultatele într-o ordine clară de acțiune, cu riscuri și următorii pași.',
+  secretara: 'Ești secretara AI. Cercetează pe web doar când este necesar, apoi organizează informația într-un rezumat clar, cu surse și sarcini următoare.'
+};
+
+function extractText(data) {
+  if (typeof data?.output_text === 'string' && data.output_text.trim()) return data.output_text.trim();
+  const chunks = [];
+  for (const item of data?.output || []) {
+    for (const content of item?.content || []) {
+      if (content?.type === 'output_text' && content?.text) chunks.push(content.text);
+    }
+  }
+  return chunks.join('\n\n').trim();
+}
+
+export async function POST(request) {
+  try {
+    const { worker = 'produse', query = '' } = await request.json();
+    const cleanQuery = String(query || '').trim();
+    if (!cleanQuery) {
+      return NextResponse.json({ error: 'Scrie ce vrei să cerceteze muncitorul AI.' }, { status: 400 });
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({
+        error: 'Aplicația este pregătită pentru cercetare reală, dar lipsește OPENAI_API_KEY în Vercel → Settings → Environment Variables.'
+      }, { status: 503 });
+    }
+
+    const model = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
+    const instructions = workerPrompts[worker] || workerPrompts.produse;
+
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        tools: [{ type: 'web_search' }],
+        tool_choice: 'auto',
+        instructions: `${instructions}\n\nRăspunde în română. Pentru informațiile obținute de pe internet, include la final o secțiune scurtă „Surse” cu URL-urile principale pe care le-ai folosit. Nu spune că ai acces la date private, volume de vânzări Amazon sau conturi dacă nu sunt publice.`,
+        input: cleanQuery
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const message = data?.error?.message || `Eroare API (${response.status})`;
+      return NextResponse.json({ error: message }, { status: response.status });
+    }
+
+    const result = extractText(data);
+    return NextResponse.json({
+      result: result || 'Cercetarea s-a terminat, dar serviciul nu a returnat text.',
+      mode: 'real-web',
+      model
+    });
+  } catch (error) {
+    console.error('research route error', error);
+    return NextResponse.json({ error: 'A apărut o eroare la cercetarea online.' }, { status: 500 });
+  }
 }
