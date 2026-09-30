@@ -1,24 +1,17 @@
-# Comerț Studio
-Prototip PWA pentru Android/iOS/Windows, publicat ca proiect separat pe Vercel. Nu cumpără, nu contactează furnizori, nu publică reclame și nu garantează venituri.
+# Comerț Studio — căutare reală de produse
 
-## Funcții disponibile
-Coordonator cu o cerere și etape transparente; sugestii Google live cu etichete explicite; import Google Trends CSV; oferte introduse cu linkuri și costuri; calculator de contribuție; șabloane română/spaniolă; afiș PNG din fotografia utilizatorului; Shopify CSV draft; comenzi simulate; copie JSON locală.
+Proiect PWA pentru browser Android/iOS/Windows, pregătit pentru Vercel.
 
-## AI avansat
-Endpoint `/api/director` este pregătit pentru Vercel AI Gateway, dar este dezactivat implicit. Configurează `AI_ENABLED=true`, `AI_MODEL` (un model ales din catalogul curent), `AI_GATEWAY_API_KEY` sau OIDC Vercel, și `STUDIO_ACCESS_TOKEN`. Activează doar după configurarea accesului și a bugetului. Cererile AI cer antet `x-studio-access`; interfața publică nu stochează cheia și nu are autentificare de utilizator încă. Nu se vând abonamente în acest prototip. Generarea AI de imagini nu este conectată; editorul local folosește fotografia reală.
+## Căutare independentă de magazin
+GET /api/products?q=paraguas%20plegable&country=ES interoghează Shopify Global Catalog prin MCP. Nu cere conectarea unui magazin. Returnează variante comerciale, fotografii ale sursei, prețuri și moneda originală, descrieri și pagina comerciantului. Ordinea indică relevanța, nu numărul de vânzări.
 
-## Teste
-`npm test` — formule de marjă, export CSV, Trends, limite, coordonator, simulare. Nicio dependență externă necesară. Configurează Vercel outputDirectory `public`, API Node în `api` (incluse în vercel.json).
+Profilul UCP folosit implicit este exemplul public documentat de Shopify, pentru acest test. Variabila UCP_AGENT_PROFILE permite configurarea unui profil propriu. Accesul public a funcționat la verificarea din 30 septembrie 2026; disponibilitatea serviciului extern se poate schimba. Nu este necesară instalarea utilitarului UCP și nu trimitem identificatori de sesiune.
 
-## Limite
-Sugestiile nu măsoară vânzări și nu sunt clasament. Prețurile furnizorilor nu sunt verificate automat. Costurile folosesc EUR, fără conversii. TVA este model simplificat fără deducerea TVA din achiziții. Datele sunt locale; CSV Trends și fotografia se reîncarcă după reluare. Nu există magazin conectat, catalog AliExpress autorizat, autentificare SaaS, billing sau expediere reală. Nu folosi date personale reale în simulare.
+## Limite explicite
+Catalogul conține oferte comerciale, nu confirmări de furnizori dropshipping. Prețurile observate nu sunt introduse automat drept costuri de aprovizionare. Transportul, taxele, cantitatea, dreptul de revânzare și condițiile de livrare se confirmă separat. Descrierile sintetizate de catalog sunt etichetate pentru confirmare. Serviciile AliExpress/CJ/BigBuy nu sunt conectate. Nu avem un clasament verificat de vânzări sau garanții de profit.
 
-## Versiunea 0.2: fișe reale de produs
+## Validare
+npm test — 18 teste. Căutări efective pentru Spania: paraguas plegable, organizador armario, chaqueta invierno; fiecare a furnizat opt variante cu imagini și prețuri EUR. Publicarea și verificarea în browser sunt un pas separat de această verificare a sursei.
 
-Căutarea gratuită citește un index public Bing RSS și metadatele Product JSON-LD din paginile comercianților acceptați. Nu există contract SLA, catalog complet sau dovadă de vânzări. Unele pagini nu permit citirea fără autentificare ori nu au metadate; acestea apar ca indisponibile. Se poate solicita direct o pagină exactă prin API-ul `/api/product` (POST cu `url`). Nu se citește checkout-ul și nu se ghicește transportul gratuit.
-
-Opțional: `SERPAPI_KEY` conectează căutarea Google Shopping. `PRODUCT_SEARCH_TOKEN` restricționează apelurile când este configurat, prin header-ul `x-studio-access`. Interfața de autentificare nu este încă implementată; nu configura un serviciu plătit pe un endpoint public fără protecție și limită de cost. Nu sunt configurate chei în arhiva livrată.
-
-AliExpress/CJ/DSers nu sunt încă autorizate prin API. Prețul achiziției se introduce după verificarea variantei, cantității, țării și checkout-ului. Transportul 0 este permis numai după confirmare; transportul necunoscut rămâne lipsă. Prețul observat într-un magazin este reper comercial, nu cost de furnizor. Monedele nu sunt convertite implicit. Catalogul păstrează fotografia, descrierea, caracteristicile, prețul/range-ul și momentul citirii, în măsura în care sursa le publică. Numele de produs nu este înlocuit cu o sugestie Google. Categoriile de sezon predefinite sunt reguli editoriale, nu un clasament măsurat.
-
-Calculul include costurile suplimentare de import introduse de utilizator. Livrarea necunoscută nu împiedică păstrarea ofertei, dar transportul necesar calculului nu poate fi lăsat gol. Exportul rămâne schiță, iar comenzile rămân simulări.
+## Funcții suplimentare
+Citirea paginilor comerciale acceptate: POST /api/product. Calculele financiare utilizează costurile confirmate introduse de utilizator. Export Shopify CSV ca produs draft. Datele locale se pot exporta/restaura. Directorul folosește reguli explicite, nu un model AI conectat. Generarea AI de fotografii, traducerea AI și publicarea automată pe rețele sociale nu sunt implementate.
