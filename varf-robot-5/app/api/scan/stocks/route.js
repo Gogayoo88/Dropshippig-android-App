@@ -60,7 +60,7 @@ export async function GET(){
     const parts=await mapLimit(FALLBACK,6,async sym=>{try{const y=await yahoo(sym);return {symbol:sym,regularMarketPrice:y.price,regularMarketChangePercent:y.daily,regularMarketVolume:y.volume,marketState:y.marketState};}catch{return null}}); quotes=parts.filter(Boolean);
   }
 
-  const candidates=quotes.map(q=>({sym:q.symbol,price:num(q.regularMarketPrice),daily:num(q.regularMarketChangePercent),volume:num(q.regularMarketVolume),marketState:q.marketState||null})).filter(x=>Number.isFinite(x.price)&&Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=0).sort((a,b)=>b.daily-a.daily);
+  const candidates=quotes.map(q=>({sym:q.symbol,price:num(q.regularMarketPrice),daily:num(q.regularMarketChangePercent),volume:num(q.regularMarketVolume),marketState:q.marketState||null})).filter(x=>Number.isFinite(x.price)&&Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=2).sort((a,b)=>b.daily-a.daily);
 
   const F=process.env.FINNHUB_API_KEY,T=process.env.TWELVEDATA_API_KEY,A=process.env.ALPHAVANTAGE_API_KEY,M=process.env.MASSIVE_API_KEY||process.env.POLYGON_API_KEY,AK=process.env.ALPACA_API_KEY,AS=process.env.ALPACA_API_SECRET;
   const scanned=await mapLimit(candidates,5,async c=>{
@@ -74,9 +74,15 @@ export async function GET(){
    return candidateRow({symbol:c.sym,price:Number.isFinite(y.price)?y.price:c.price,daily:safePct(Number.isFinite(y.daily)?y.daily:c.daily),currency:'USD',quoteVolume:Number.isFinite(y.volume)?y.volume:c.volume,marketState:y.marketState||c.marketState},sources,{rsi:rsi(extra.closes||[]),volRatio:volumeRatio(extra.vols||[]),momentum:safePct(momentum)});
   });
   scanned.sort((a,b)=>(b.agree-a.agree)||(b.agreePct-a.agreePct)||(b.daily-a.daily));
-  const rows=scanned.filter(x=>x.verdict==='INTRARE POSIBILĂ'||x.verdict==='SEMNAL PUTERNIC');
+  const rows=scanned.filter(x=>{
+    const signal=x.verdict==='INTRARE POSIBILĂ'||x.verdict==='SEMNAL PUTERNIC';
+    if(!signal) return false;
+    if(x.daily<=0) return true;
+    // Pentru 0…+2% acceptăm numai continuări foarte timpurii, cu volum și impuls clar.
+    return x.daily<=2 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0 && Number(x.agree)>=4;
+  });
   const directoryFallbackUsed=universeSymbols.length===FALLBACK.length && universeSymbols.every((x,i)=>x===FALLBACK[i]);
   const incomplete=directoryFallbackUsed||quoteFallbackUsed;
-  return NextResponse.json({ok:true,kind:'stocks',asOf:new Date().toISOString(),universe:incomplete?FALLBACK.length:universeSymbols.length,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:incomplete?'Scanarea completă a universului SUA nu a putut fi confirmată în această rundă; aplicația a folosit temporar lista de bază și NU o prezintă ca acoperire completă.':'Motor 1 a folosit directorul Nasdaq/NYSE/alte burse SUA și a verificat universul listat. Motor 2 a verificat TOȚI candidații −10%…0%. Sunt afișați numai cei cu minimum 3 confirmări și tehnic favorabil. Sursele cu cheie API lipsă rămân indisponibile și nu sunt numărate.'});
+  return NextResponse.json({ok:true,kind:'stocks',asOf:new Date().toISOString(),universe:incomplete?FALLBACK.length:universeSymbols.length,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:incomplete?'Scanarea completă a universului SUA nu a putut fi confirmată în această rundă; aplicația a folosit temporar lista de bază și NU o prezintă ca acoperire completă.':'Motor 1 a folosit directorul Nasdaq/NYSE/alte burse SUA și a verificat universul listat. Motor 2 a verificat TOȚI candidații −10%…+2%. Pentru 0…+2% sunt afișate numai activele cu volum ≥1,20×, momentum pozitiv și minimum 4 confirmări. Sunt afișați numai cei cu minimum 3 confirmări și tehnic favorabil. Sursele cu cheie API lipsă rămân indisponibile și nu sunt numărate.'});
  }catch(e){return NextResponse.json({ok:false,error:`Acțiuni: ${e.message}`},{status:502});}
 }
