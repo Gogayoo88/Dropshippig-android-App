@@ -72,9 +72,9 @@ export function verdict({ sources, rsiValue, volRatioValue, momentum }) {
   const volOk = volRatioValue == null || volRatioValue >= 0.9;
   const techOk = rsiOk && volOk && Number(momentum || 0) > 0;
   let label = 'AȘTEAPTĂ';
-  if (active < 3) label = 'DATE INSUFICIENTE';
-  else if (agree >= 4 && techOk) label = 'SEMNAL PUTERNIC';
-  else if (agree >= 3 && techOk) label = 'INTRARE POSIBILĂ';
+  if (active < 5) label = 'DATE INSUFICIENTE';
+  else if (agree >= 6 && techOk) label = 'SEMNAL PUTERNIC';
+  else if (agree >= 5 && techOk) label = 'INTRARE POSIBILĂ';
   return { active, agree, disagree, unavailable, agreePct, sourceTarget, verdict: label };
 }
 
