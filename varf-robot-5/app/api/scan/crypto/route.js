@@ -92,7 +92,7 @@ export async function GET() {
     const candidates=all.map(t=>{
       const last=num(t.last_price), change=num(t.price_change_24h), prev=last-change, daily=pct(prev,last);
       return {t,last,daily,asset:assetOf(t.symbol)};
-    }).filter(x=>Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=0&&Number.isFinite(x.last)).sort((a,b)=>b.daily-a.daily);
+    }).filter(x=>Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=2&&Number.isFinite(x.last)).sort((a,b)=>b.daily-a.daily);
 
     let revMom = new Map();
     try { revMom = await revolutRecentMomentum(); } catch { /* source will show unavailable */ }
@@ -115,7 +115,13 @@ export async function GET() {
     });
 
     scanned.sort((a,b)=>(b.agree-a.agree)||(b.agreePct-a.agreePct)||(b.daily-a.daily));
-    const rows=scanned.filter(x=>x.verdict==='INTRARE POSIBILĂ'||x.verdict==='SEMNAL PUTERNIC');
-    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…0%. Motor 2 a verificat TOȚI acești candidați; sunt afișați numai cei cu minimum 3 confirmări și condiții tehnice favorabile.`});
+    const rows=scanned.filter(x=>{
+      const signal=x.verdict==='INTRARE POSIBILĂ'||x.verdict==='SEMNAL PUTERNIC';
+      if(!signal) return false;
+      if(x.daily<=0) return true;
+      // Pentru 0…+2% acceptăm numai continuări foarte timpurii, cu volum și impuls clar.
+      return x.daily<=2 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0 && Number(x.agree)>=4;
+    });
+    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…+2%. Pentru 0…+2% intră în listă numai activele cu impuls de volum ≥1,20×, momentum pozitiv și minimum 4 confirmări. Motor 2 a verificat TOȚI acești candidați; sunt afișați numai cei cu minimum 3 confirmări și condiții tehnice favorabile.`});
   } catch(e) { return NextResponse.json({ok:false,error:`Crypto: ${e.message}`},{status:502}); }
 }
