@@ -17,18 +17,18 @@ export default function Home(){
  async function scanAll(){setLoading(true);setErr('');try{const [a,b]=await Promise.all([fetch('/api/scan/crypto',{cache:'no-store'}).then(r=>r.json()),fetch('/api/scan/stocks',{cache:'no-store'}).then(r=>r.json())]);setMode('all');setData({ok:a.ok||b.ok,kind:'all',asOf:new Date().toISOString(),universe:(a.universe||0)+(b.universe||0),deepScanned:(a.deepScanned||0)+(b.deepScanned||0),rows:[...(a.rows||[]).map(x=>({...x,_kind:'crypto'})),...(b.rows||[]).map(x=>({...x,_kind:'stocks'}))].sort((x,y)=>(y.agree-x.agree)||(y.agreePct-x.agreePct)||(x.daily-y.daily)),note:[a.note,b.note].filter(Boolean).join(' • ')});}catch(e){setErr(e.message)}finally{setLoading(false)}}
  const rows=useMemo(()=>data?.rows||[],[data]);
  return <main>
-  <header><div><h1>VÂRF <span>ROBOT 5</span></h1><p>Scanner multi-sursă • caută în primul rând active de la −10% până la +2%; pe plus intră doar cu volum puternic</p></div><div className="live"><i></i> DATE LIVE • minimum 5 surse active • indisponibilele NU se numără</div></header>
+  <header><div><h1>VÂRF <span>ROBOT 5</span></h1><p>Scanner multi-sursă • caută în primul rând active de la −10% până la +2%; pe plus intră doar cu volum puternic</p></div><div className="live"><i></i> DATE LIVE • surse reale • indisponibilele NU se numără</div></header>
   <section className="robotZone">
    <button className="eye left" onClick={()=>scan('crypto')} aria-label="Scanează crypto"><span>₿</span><small>CRYPTO</small></button>
    <button className={'nose '+(loading?'scanning':'')} onClick={scanAll} aria-label="Scanare totală"><span>SCAN</span><small>{loading?'SCANEZ…':'TOTAL'}</small></button>
    <button className="eye right" onClick={()=>scan('stocks')} aria-label="Scanează acțiuni"><span>↗</span><small>ACȚIUNI</small></button>
-   <div className="mouth">5 confirmări + tehnic = INTRARE POSIBILĂ • 6+ = SEMNAL PUTERNIC</div>
+   <div className="mouth">2 = URMĂREȘTE • 3–4 = APROAPE • 5 = INTRARE POSIBILĂ • 6+ = SEMNAL PUTERNIC</div>
   </section>
   <nav><button className={mode==='crypto'?'active':''} onClick={()=>scan('crypto')}>Crypto</button><button className={mode==='stocks'?'active':''} onClick={()=>scan('stocks')}>Acțiuni</button><button className={mode==='all'?'active':''} onClick={scanAll}>Toate</button></nav>
   {err&&<div className="error">{err}</div>}
   {!data&&!loading&&<div className="empty">Pornește o scanare. Nu sunt afișate exemple sau confirmări inventate.</div>}
   {loading&&<div className="empty pulse">Se citesc piețele și se verifică sursele…</div>}
-  {data&&!loading&&<><div className="summary"><span>Univers verificat <b>{data.universe}</b></span><span>Candidați −10…+2 <b>{data.deepScanned}</b></span><span>Cu semnal <b>{data.qualified??rows.length}</b></span><span>Actualizat <b>{new Date(data.asOf).toLocaleTimeString('ro-RO',{timeZone:'Europe/Madrid'})}</b> ES</span></div>{data.note&&<div className="note">{data.note}</div>}<section className="grid">{rows.map((x,i)=><Card key={`${x._kind||data.kind}-${x.symbol}-${i}`} x={x} kind={x._kind||data.kind}/>)}</section>{!rows.length&&<div className="empty">Niciun activ nu are acum minimum 5 confirmări din surse active + condiții tehnice favorabile în filtrul −10%…+2% (pe plus cerem volum puternic).</div>}</>}
+  {data&&!loading&&<><div className="summary"><span>Univers verificat <b>{data.universe}</b></span><span>Candidați −10…+2 <b>{data.deepScanned}</b></span><span>Cu semnal <b>{data.qualified??rows.length}</b></span><span>Actualizat <b>{new Date(data.asOf).toLocaleTimeString('ro-RO',{timeZone:'Europe/Madrid'})}</b> ES</span></div>{data.note&&<div className="note">{data.note}</div>}<section className="grid">{rows.map((x,i)=><Card key={`${x._kind||data.kind}-${x.symbol}-${i}`} x={x} kind={x._kind||data.kind}/>)}</section>{!rows.length&&<div className="empty">Niciun activ nu are acum minimum 2 confirmări pentru afișare; verdictul de intrare cere mai multe surse în filtrul −10%…+2% (pe plus cerem volum puternic).</div>}</>}
   <footer>Semnalele sunt analiză tehnică, nu garanții. 3–4 surse care coincid reduc incertitudinea, dar nu pot garanta că prețul va urca.</footer>
  </main>
 }
