@@ -120,8 +120,8 @@ export async function GET() {
       if(!signal) return false;
       if(x.daily<=0) return true;
       // Pentru 0…+2% acceptăm numai continuări foarte timpurii, cu volum și impuls clar.
-      return x.daily<=2 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0 && Number(x.agree)>=4;
+      return x.daily<=2 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0 && Number(x.agree)>=5;
     });
-    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…+2%. Pentru 0…+2% intră în listă numai activele cu impuls de volum ≥1,20×, momentum pozitiv și minimum 4 confirmări. Motor 2 a verificat TOȚI acești candidați; sunt afișați numai cei cu minimum 3 confirmări și condiții tehnice favorabile.`});
+    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…+2%. Pentru 0…+2% intră în listă numai activele cu impuls de volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Motor 2 a verificat TOȚI acești candidați; sunt afișați numai cei cu minimum 5 confirmări, din cel puțin 5 surse active, și condiții tehnice favorabile.`});
   } catch(e) { return NextResponse.json({ok:false,error:`Crypto: ${e.message}`},{status:502}); }
 }
