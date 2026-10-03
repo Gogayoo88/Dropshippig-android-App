@@ -116,12 +116,12 @@ export async function GET() {
 
     scanned.sort((a,b)=>(b.agree-a.agree)||(b.agreePct-a.agreePct)||(b.daily-a.daily));
     const rows=scanned.filter(x=>{
-      const signal=x.verdict==='INTRARE POSIBILĂ'||x.verdict==='SEMNAL PUTERNIC';
-      if(!signal) return false;
+      const visible=Number(x.agree)>=2 && Number(x.active)>=2;
+      if(!visible) return false;
       if(x.daily<=0) return true;
-      // Pentru 0…+2% acceptăm numai continuări foarte timpurii, cu volum și impuls clar.
-      return x.daily<=2 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0 && Number(x.agree)>=5;
+      // Pe +0…+2% păstrăm numai continuări timpurii cu volum și impuls pozitiv.
+      return x.daily<=2 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0;
     });
-    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…+2%. Pentru 0…+2% intră în listă numai activele cu impuls de volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Motor 2 a verificat TOȚI acești candidați; sunt afișați numai cei cu minimum 5 confirmări, din cel puțin 5 surse active, și condiții tehnice favorabile.`});
+    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…+2%. Pentru 0…+2% intră în listă numai activele cu impuls de volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Motor 2 a verificat TOȚI acești candidați; sunt afișați candidații de la 2 confirmări în sus. 2 = URMĂREȘTE, 3–4 = APROAPE DE INTRARE, 5 = INTRARE POSIBILĂ, 6+ = SEMNAL PUTERNIC. Sursele indisponibile nu sunt numărate.`});
   } catch(e) { return NextResponse.json({ok:false,error:`Crypto: ${e.message}`},{status:502}); }
 }
