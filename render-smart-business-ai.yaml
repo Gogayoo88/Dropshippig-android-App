@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: smart-business-ai-n8n
+    runtime: docker
+    plan: free
+    region: frankfurt
+    repo: https://github.com/Gogayoo88/Dropshippig-android-App
+    branch: main
+    rootDir: smart-business-ai
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-business-ai-db
+          property: connectionString
+      - key: N8N_ENCRYPTION_KEY
+        generateValue: true
+      - key: N8N_SECURE_COOKIE
+        value: "true"
+      - key: N8N_DIAGNOSTICS_ENABLED
+        value: "false"
+      - key: N8N_PERSONALIZATION_ENABLED
+        value: "false"
+      - key: N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS
+        value: "true"
+      - key: GENERIC_TIMEZONE
+        value: Europe/Madrid
+      - key: TZ
+        value: Europe/Madrid
+
+databases:
+  - name: smart-business-ai-db
+    plan: free
+    region: frankfurt
+    databaseName: smartbusiness
+    user: smartbusiness
