@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useState} from 'react';
 
 const blankBusiness={
-  business_id:'demo_salon_001',name:'Peluquería Demo',type:'Peluquería',phone:'+34 ',
+  business_id:'demo_salon_001',name:'Peluquería Demo',type:'Peluquería',phone:'+34 ',email:'',website:'',
   timezone:'Europe/Madrid',address:'',languages:'Español, Română',
   schedule:'Luni-Vineri 09:00-19:00\nSâmbătă 09:00-14:00\nDuminică închis',
   services:[
@@ -22,18 +22,33 @@ const fmtLeft=(b)=>{
   return h+'h '+m+'m';
 };
 
+function detectLang(msg){
+  const q=msg.toLowerCase();
+  if(/[¿¡]|\b(hola|precio|cuánto|cuanto|horario|cita|reserva|abierto|cerrado|dónde|donde)\b/.test(q)) return 'es';
+  if(/\b(hello|price|appointment|booking|open|closed|where|service)\b/.test(q)) return 'en';
+  return 'ro';
+}
+function phrase(lang,key){
+  const t={
+    ro:{askService:'Spuneți-mi serviciul dorit și vă dau prețul confirmat din fișa firmei.',addressMissing:'Adresa nu este încă introdusă în fișa firmei.',booking:'Pot înregistra o cerere de rezervare. Alegeți data, ora și serviciul.',unknown:'Nu am informația confirmată în fișa firmei. Pot transmite întrebarea către firmă.',wantBooking:'Doriți și o programare?'},
+    es:{askService:'Dígame qué servicio desea y le indico el precio confirmado en la ficha del negocio.',addressMissing:'La dirección todavía no está registrada en la ficha del negocio.',booking:'Puedo registrar una solicitud de reserva. Indique fecha, hora y servicio.',unknown:'No tengo esa información confirmada en la ficha del negocio. Puedo enviar la pregunta al negocio.',wantBooking:'¿Quiere que compruebe también una cita?'},
+    en:{askService:'Tell me which service you want and I will give you the confirmed price from the business profile.',addressMissing:'The address has not been added to the business profile yet.',booking:'I can register a booking request. Choose the date, time and service.',unknown:'I do not have that information confirmed in the business profile. I can forward the question to the business.',wantBooking:'Would you like me to check an appointment too?'}
+  };
+  return t[lang]?.[key]||t.ro[key];
+}
 function answer(b,msg){
   const q=msg.toLowerCase().trim();
+  const lang=detectLang(msg);
   const service=b.services.find(s=>q.includes(s.name.toLowerCase()));
   if(/preț|pret|cât cost|cat cost|precio|cuánto cuesta|cuanto cuesta/.test(q)){
-    if(service)return `${service.name}: ${service.price}. Doriți și o programare?`;
-    return 'Spuneți-mi serviciul dorit și vă dau prețul confirmat din fișa firmei.';
+    if(service)return `${service.name}: ${service.price}. ${phrase(lang,'wantBooking')}`;
+    return phrase(lang,'askService');
   }
   if(/program|orar|deschis|închis|abierto|cerrado|horario/.test(q))return b.schedule;
-  if(/adres|unde|direc|dónde|donde/.test(q))return b.address||'Adresa nu este încă introdusă în fișa firmei.';
-  if(/programare|rezerv|cita|reserva|appointment/.test(q))return 'Pot înregistra o cerere de rezervare. Alegeți data, ora și serviciul.';
+  if(/adres|unde|direc|dónde|donde|where/.test(q))return b.address||phrase(lang,'addressMissing');
+  if(/programare|rezerv|cita|reserva|appointment|booking/.test(q))return phrase(lang,'booking');
   if(/servici|servicio|ofert/.test(q))return b.services.map(s=>`${s.name} — ${s.price}`).join('\n');
-  return 'Nu am informația confirmată în fișa firmei. Pot transmite întrebarea către firmă.';
+  return phrase(lang,'unknown');
 }
 
 export default function Home(){
@@ -94,6 +109,8 @@ export default function Home(){
         <label>Nume firmă<input value={business.name} onChange={e=>setBusiness({...business,name:e.target.value})}/></label>
         <label>Tip afacere<input value={business.type} onChange={e=>setBusiness({...business,type:e.target.value})}/></label>
         <label>Telefon firmă<input value={business.phone} onChange={e=>setBusiness({...business,phone:e.target.value})}/></label>
+        <label>Email firmă<input type="email" value={business.email||''} onChange={e=>setBusiness({...business,email:e.target.value})}/></label>
+        <label>Site web<input value={business.website||''} onChange={e=>setBusiness({...business,website:e.target.value})}/></label>
         <label>Adresă<input value={business.address} onChange={e=>setBusiness({...business,address:e.target.value})}/></label>
         <label>Program<textarea value={business.schedule} onChange={e=>setBusiness({...business,schedule:e.target.value})}/></label>
         <div className="row">
@@ -150,10 +167,13 @@ export default function Home(){
     </section>
 
     <section className="card channels">
-      <h2>Canale</h2>
-      <div className="channel"><div><b>WhatsApp Business</b><p>Conectare oficială Meta — sigură pentru producție</p></div><span className="pending">DE CONECTAT</span></div>
-      <div className="channel"><div><b>SMS prin Android</b><p>Telefon dedicat / aplicație gateway — test separat</p></div><span className="pending">DE CONECTAT</span></div>
-      <div className="channel"><div><b>n8n Cloud Engine</b><p>Workflow-uri, webhook-uri, rezervări și automatizări</p></div><span className="pending">AȘTEAPTĂ RENDER</span></div>
+      <h2>Canale și automatizări</h2>
+      <div className="channel"><div><b>WhatsApp Business</b><p>Conectare oficială Meta; robotul citește și răspunde după autorizarea numărului firmei.</p></div><span className="pending">DE CONECTAT</span></div>
+      <div className="channel"><div><b>Email</b><p>Gmail / Outlook / IMAP cu autorizare; răspunsuri automate sau propuneri pentru aprobare.</p></div><span className="pending">DE CONECTAT</span></div>
+      <div className="channel"><div><b>Chat / formular pe site</b><p>Widget pentru site-ul firmei: întrebări, servicii, prețuri și cereri de programare.</p></div><span className="pending">PREGĂTIT ÎN PANOU</span></div>
+      <div className="channel"><div><b>SMS prin Android</b><p>Telefon dedicat / aplicație gateway pentru SMS; separat de WhatsApp.</p></div><span className="pending">DE CONECTAT</span></div>
+      <div className="channel"><div><b>Răspuns multilingv</b><p>Detectează limba clientului și răspunde în aceeași limbă; traducere liberă când conectăm motorul AI.</p></div><span className="pending">DEMO RO / ES / EN</span></div>
+      <div className="channel"><div><b>n8n Cloud Engine</b><p>Workflow-uri, webhook-uri, rezervări, email, WhatsApp și reguli per firmă.</p></div><span className="pending">AȘTEAPTĂ RENDER</span></div>
     </section>
   </main>
 }
