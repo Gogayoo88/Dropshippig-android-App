@@ -89,7 +89,7 @@ export async function GET(){
   const candidates=quotes.map(q=>{
     const eu=EUROPE_META.get(q.symbol);
     return {sym:q.symbol,price:num(q.regularMarketPrice),daily:num(q.regularMarketChangePercent),volume:num(q.regularMarketVolume),marketState:q.marketState||null,currency:q.currency||null,region:eu?.region||'SUA',exchange:eu?.exchange||'SUA'};
-  }).filter(x=>Number.isFinite(x.price)&&Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=2).sort((a,b)=>b.daily-a.daily);
+  }).filter(x=>Number.isFinite(x.price)&&Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=1).sort((a,b)=>b.daily-a.daily);
 
   const F=process.env.FINNHUB_API_KEY,T=process.env.TWELVEDATA_API_KEY,A=process.env.ALPHAVANTAGE_API_KEY,M=process.env.MASSIVE_API_KEY||process.env.POLYGON_API_KEY,AK=process.env.ALPACA_API_KEY,AS=process.env.ALPACA_API_SECRET;
   const scanned=await mapLimit(candidates,5,async c=>{
@@ -107,10 +107,10 @@ export async function GET(){
     const visible=Number(x.agree)>=2 && Number(x.active)>=2;
     if(!visible) return false;
     if(x.daily<=0) return true;
-    return x.daily<=2 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0;
+    return x.daily<=1 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0;
   });
   const directoryFallbackUsed=usUniverseSymbols.length===FALLBACK.length && usUniverseSymbols.every((x,i)=>x===FALLBACK[i]);
   const incomplete=directoryFallbackUsed||quoteFallbackUsed;
-  return NextResponse.json({ok:true,kind:'stocks',asOf:new Date().toISOString(),universe:incomplete?(FALLBACK.length+EUROPE_CORE.length):universeSymbols.length,usUniverse:directoryFallbackUsed?FALLBACK.length:usUniverseSymbols.length,europeUniverse:EUROPE_CORE.length,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:incomplete?`Scannerul verifică SUA + Europa. Directorul complet SUA nu a putut fi confirmat în această rundă, deci SUA folosește temporar lista de bază; Europa rămâne activă cu ${EUROPE_CORE.length} acțiuni lichide multi-bursă (Spania, Germania, Franța, Italia, Olanda, Belgia, Portugalia, Regatul Unit, Elveția și Nordice). Nu prezentăm această listă europeană ca întreaga piață europeană.`:`Motor 1 verifică directorul Nasdaq/NYSE/alte burse SUA plus ${EUROPE_CORE.length} acțiuni lichide din piețele europene. Motor 2 a verificat TOȚI candidații −10%…+2%. Pentru 0…+2% sunt afișate numai activele cu volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Sunt afișați candidații de la 2 confirmări în sus. 2 = URMĂREȘTE, 3–4 = APROAPE DE INTRARE, 5 = INTRARE POSIBILĂ, 6+ = SEMNAL PUTERNIC. Sursele indisponibile nu sunt numărate. Sursele cu cheie API lipsă rămân indisponibile și nu sunt numărate.`});
+  return NextResponse.json({ok:true,kind:'stocks',asOf:new Date().toISOString(),universe:incomplete?(FALLBACK.length+EUROPE_CORE.length):universeSymbols.length,usUniverse:directoryFallbackUsed?FALLBACK.length:usUniverseSymbols.length,europeUniverse:EUROPE_CORE.length,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:incomplete?`Scannerul verifică SUA + Europa. Directorul complet SUA nu a putut fi confirmat în această rundă, deci SUA folosește temporar lista de bază; Europa rămâne activă cu ${EUROPE_CORE.length} acțiuni lichide multi-bursă (Spania, Germania, Franța, Italia, Olanda, Belgia, Portugalia, Regatul Unit, Elveția și Nordice). Nu prezentăm această listă europeană ca întreaga piață europeană.`:`Motor 1 verifică directorul Nasdaq/NYSE/alte burse SUA plus ${EUROPE_CORE.length} acțiuni lichide din piețele europene. Motor 2 a verificat TOȚI candidații −10%…+1%. Pentru 0…+1% sunt afișate numai activele cu volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Sunt afișați candidații de la 2 confirmări în sus. 2 = URMĂREȘTE, 3–4 = APROAPE DE INTRARE, 5 = INTRARE POSIBILĂ, 6+ = SEMNAL PUTERNIC. Sursele indisponibile nu sunt numărate. Sursele cu cheie API lipsă rămân indisponibile și nu sunt numărate.`});
  }catch(e){return NextResponse.json({ok:false,error:`Acțiuni: ${e.message}`},{status:502});}
 }
