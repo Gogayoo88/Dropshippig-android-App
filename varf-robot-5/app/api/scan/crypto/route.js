@@ -92,7 +92,7 @@ export async function GET() {
     const candidates=all.map(t=>{
       const last=num(t.last_price), change=num(t.price_change_24h), prev=last-change, daily=pct(prev,last);
       return {t,last,daily,asset:assetOf(t.symbol)};
-    }).filter(x=>Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=2&&Number.isFinite(x.last)).sort((a,b)=>b.daily-a.daily);
+    }).filter(x=>Number.isFinite(x.daily)&&x.daily>=-15&&x.daily<=2&&Number.isFinite(x.last)).sort((a,b)=>b.daily-a.daily);
 
     let revMom = new Map();
     try { revMom = await revolutRecentMomentum(); } catch { /* source will show unavailable */ }
@@ -122,6 +122,6 @@ export async function GET() {
       // Pe +0…+2% păstrăm numai continuări timpurii cu volum și impuls pozitiv.
       return x.daily<=2 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0;
     });
-    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…+2%. Pentru 0…+2% intră în listă numai activele cu impuls de volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Motor 2 a verificat TOȚI acești candidați; sunt afișați candidații de la 2 confirmări în sus. 2 = URMĂREȘTE, 3–4 = APROAPE DE INTRARE, 5 = INTRARE POSIBILĂ, 6+ = SEMNAL PUTERNIC. Sursele indisponibile nu sunt numărate.`});
+    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −15%…+2%. Pentru 0…+2% intră în listă numai activele cu impuls de volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Motor 2 a verificat TOȚI acești candidați; sunt afișați candidații de la 2 confirmări în sus. 2 = URMĂREȘTE, 3–4 = APROAPE DE INTRARE, 5 = INTRARE POSIBILĂ, 6+ = SEMNAL PUTERNIC. Sursele indisponibile nu sunt numărate.`});
   } catch(e) { return NextResponse.json({ok:false,error:`Crypto: ${e.message}`},{status:502}); }
 }
