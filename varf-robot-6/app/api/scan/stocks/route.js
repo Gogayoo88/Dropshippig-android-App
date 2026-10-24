@@ -101,15 +101,17 @@ export async function GET(){
   const F=process.env.FINNHUB_API_KEY,T=process.env.TWELVEDATA_API_KEY,A=process.env.ALPHAVANTAGE_API_KEY,M=process.env.MASSIVE_API_KEY||process.env.POLYGON_API_KEY,AK=process.env.ALPACA_API_KEY,AS=process.env.ALPACA_API_SECRET;
   const scanned=await mapLimit(candidates,5,async c=>{
    let y; try{y=await yahoo(c.sym)}catch{y={price:c.price,daily:c.daily,m15:NaN,closes:[],vols:[],marketState:c.marketState,volume:c.volume}}
-   // A quote must explicitly report the regular session as open; missing/closed/pre/post-market state is not a live stock signal.
-   if (y.marketState !== 'REGULAR') return null;
+   // Chart metadata may omit marketState; fall back to the bulk quote's explicit session state.
+   const liveMarketState = y.marketState || c.marketState;
+   // Never treat missing, closed, pre-market or post-market data as a live regular-session signal.
+   if (liveMarketState !== 'REGULAR') return null;
    const jobs=await Promise.all([
     {s:Number.isFinite(y.m15)?source('Yahoo',true,y.m15,null,'5m'):source('Yahoo',false,null,'fără bare intraday'),x:y},
     call('Finnhub',()=>finnhub(c.sym,F),!!F), call('Twelve Data',()=>twelve(c.sym,T),!!T), call('Alpha Vantage',()=>alpha(c.sym,A),!!A),
     call('Massive',()=>massive(c.sym,M),!!M), call('Alpaca',()=>alpaca(c.sym,AK,AS),!!AK&&!!AS)
    ]);
    const sources=jobs.map(x=>x.s); const extra=jobs.find(x=>x.x?.closes?.length>=15)?.x||y; const m=jobs.filter(x=>Number.isFinite(x.x?.m15)).map(x=>x.x.m15); const momentum=m.length?m.reduce((a,b)=>a+b,0)/m.length:0;
-   return candidateRow({symbol:c.sym,price:Number.isFinite(y.price)?y.price:c.price,daily:safePct(Number.isFinite(y.daily)?y.daily:c.daily),currency:y.currency||c.currency||(c.region==='SUA'?'USD':'—'),quoteVolume:Number.isFinite(y.volume)?y.volume:c.volume,marketState:y.marketState||c.marketState,region:c.region,exchange:c.exchange},sources,{rsi:rsi(extra.closes||[]),volRatio:volumeRatio(extra.vols||[]),momentum:safePct(momentum)});
+   return candidateRow({symbol:c.sym,price:Number.isFinite(y.price)?y.price:c.price,daily:safePct(Number.isFinite(y.daily)?y.daily:c.daily),currency:y.currency||c.currency||(c.region==='SUA'?'USD':'—'),quoteVolume:Number.isFinite(y.volume)?y.volume:c.volume,marketState:liveMarketState,region:c.region,exchange:c.exchange},sources,{rsi:rsi(extra.closes||[]),volRatio:volumeRatio(extra.vols||[]),momentum:safePct(momentum)});
   });
   const liveScanned = scanned.filter(Boolean);
   liveScanned.sort((a,b)=>(b.agree-a.agree)||(b.agreePct-a.agreePct)||(b.daily-a.daily));
