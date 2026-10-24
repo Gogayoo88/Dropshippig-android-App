@@ -82,5 +82,13 @@ export function verdict({ sources, rsiValue, volRatioValue, momentum }) {
 
 export function candidateRow(base, sources, technical = {}) {
   const v = verdict({ sources, rsiValue: technical.rsi, volRatioValue: technical.volRatio, momentum: technical.momentum });
-  return { ...base, ...technical, ...v, sources };
+  const momentumValue = Number(technical.momentum || 0);
+  const volumeValue = Number(technical.volRatio || 0);
+  const rsiValue = Number(technical.rsi);
+  const horizon = momentumValue > 0.25 && volumeValue >= 1.5
+    ? 'Impuls scurt · minute–ore'
+    : momentumValue > 0 && volumeValue >= 1 && Number.isFinite(rsiValue) && rsiValue >= 45 && rsiValue <= 65
+      ? 'Posibilă continuare · 4–24h'
+      : 'Orizont neconfirmat';
+  return { ...base, ...technical, ...v, horizon, sources };
 }
