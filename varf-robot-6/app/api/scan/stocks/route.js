@@ -73,6 +73,13 @@ async function call(name, fn, configured=true){if(!configured)return {s:source(n
 
 export async function GET(){
  try{
+  // Calendar gate uses the user's principal market timezone (Madrid).
+  // Never surface stale stock quotes on Saturday/Sunday.
+  const madridParts = new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Madrid',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+  const madrid = Object.fromEntries(madridParts.map(p=>[p.type,p.value]));
+  if (madrid.weekday === 'Sat' || madrid.weekday === 'Sun') {
+    return NextResponse.json({ok:true,kind:'stocks',asOf:new Date().toISOString(),marketOpen:false,universe:0,deepScanned:0,qualified:0,rows:[],watching:0,note:'Piețele de acțiuni sunt închise în weekend. Nu afișăm cotații vechi ca semnale noi.'});
+  }
   const usUniverseSymbols=await loadUniverse();
   const universeSymbols=[...new Set([...usUniverseSymbols,...EUROPE_CORE.map(x=>x.symbol)])];
   const batches=[]; for(let i=0;i<universeSymbols.length;i+=120)batches.push(universeSymbols.slice(i,i+120));
@@ -94,6 +101,8 @@ export async function GET(){
   const F=process.env.FINNHUB_API_KEY,T=process.env.TWELVEDATA_API_KEY,A=process.env.ALPHAVANTAGE_API_KEY,M=process.env.MASSIVE_API_KEY||process.env.POLYGON_API_KEY,AK=process.env.ALPACA_API_KEY,AS=process.env.ALPACA_API_SECRET;
   const scanned=await mapLimit(candidates,5,async c=>{
    let y; try{y=await yahoo(c.sym)}catch{y={price:c.price,daily:c.daily,m15:NaN,closes:[],vols:[],marketState:c.marketState,volume:c.volume}}
+   // A quote must explicitly report the regular session as open; missing/closed/pre/post-market state is not a live stock signal.
+   if (y.marketState !== 'REGULAR') return null;
    const jobs=await Promise.all([
     {s:Number.isFinite(y.m15)?source('Yahoo',true,y.m15,null,'5m'):source('Yahoo',false,null,'fără bare intraday'),x:y},
     call('Finnhub',()=>finnhub(c.sym,F),!!F), call('Twelve Data',()=>twelve(c.sym,T),!!T), call('Alpha Vantage',()=>alpha(c.sym,A),!!A),
@@ -102,8 +111,9 @@ export async function GET(){
    const sources=jobs.map(x=>x.s); const extra=jobs.find(x=>x.x?.closes?.length>=15)?.x||y; const m=jobs.filter(x=>Number.isFinite(x.x?.m15)).map(x=>x.x.m15); const momentum=m.length?m.reduce((a,b)=>a+b,0)/m.length:0;
    return candidateRow({symbol:c.sym,price:Number.isFinite(y.price)?y.price:c.price,daily:safePct(Number.isFinite(y.daily)?y.daily:c.daily),currency:y.currency||c.currency||(c.region==='SUA'?'USD':'—'),quoteVolume:Number.isFinite(y.volume)?y.volume:c.volume,marketState:y.marketState||c.marketState,region:c.region,exchange:c.exchange},sources,{rsi:rsi(extra.closes||[]),volRatio:volumeRatio(extra.vols||[]),momentum:safePct(momentum)});
   });
-  scanned.sort((a,b)=>(b.agree-a.agree)||(b.agreePct-a.agreePct)||(b.daily-a.daily));
-  const rows=scanned.filter(x=>{
+  const liveScanned = scanned.filter(Boolean);
+  liveScanned.sort((a,b)=>(b.agree-a.agree)||(b.agreePct-a.agreePct)||(b.daily-a.daily));
+  const rows=liveScanned.filter(x=>{
     const visible=Number(x.agree)>=5 && Number(x.active)>=6 && Number(x.momentum)>0 && Number(x.volRatio)>=1 && Number.isFinite(Number(x.rsi)) && Number(x.rsi)>=40 && Number(x.rsi)<=68;
     if(!visible) return false;
     if(x.daily<=0) return true;
@@ -111,6 +121,6 @@ export async function GET(){
   });
   const directoryFallbackUsed=usUniverseSymbols.length===FALLBACK.length && usUniverseSymbols.every((x,i)=>x===FALLBACK[i]);
   const incomplete=directoryFallbackUsed||quoteFallbackUsed;
-  return NextResponse.json({ok:true,kind:'stocks',asOf:new Date().toISOString(),universe:incomplete?(FALLBACK.length+EUROPE_CORE.length):universeSymbols.length,usUniverse:directoryFallbackUsed?FALLBACK.length:usUniverseSymbols.length,europeUniverse:EUROPE_CORE.length,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:incomplete?`Scannerul verifică SUA + Europa. Directorul complet SUA nu a putut fi confirmat în această rundă, deci SUA folosește temporar lista de bază; Europa rămâne activă cu ${EUROPE_CORE.length} acțiuni lichide multi-bursă (Spania, Germania, Franța, Italia, Olanda, Belgia, Portugalia, Regatul Unit, Elveția și Nordice). Nu prezentăm această listă europeană ca întreaga piață europeană.`:`Motor 1 verifică directorul Nasdaq/NYSE/alte burse SUA plus ${EUROPE_CORE.length} acțiuni lichide din piețele europene. Motor 2 a verificat TOȚI candidații −10%…+1%. Pentru 0…+1% sunt afișate numai activele cu volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Sunt afișate doar activele cu minimum 5 surse pozitive din cele 8 posibile, cel puțin 6 surse active, momentum pozitiv, RSI 40–68 și volum relativ ≥1× (≥1,20× când variația zilnică este pozitivă). Sursele indisponibile nu sunt numărate. Sursele cu cheie API lipsă rămân indisponibile și nu sunt numărate.`});
+  return NextResponse.json({ok:true,kind:'stocks',asOf:new Date().toISOString(),universe:incomplete?(FALLBACK.length+EUROPE_CORE.length):universeSymbols.length,usUniverse:directoryFallbackUsed?FALLBACK.length:usUniverseSymbols.length,europeUniverse:EUROPE_CORE.length,deepScanned:candidates.length,qualified:rows.length,rows,watching:liveScanned.length-rows.length,note:incomplete?`Scannerul verifică SUA + Europa. Directorul complet SUA nu a putut fi confirmat în această rundă, deci SUA folosește temporar lista de bază; Europa rămâne activă cu ${EUROPE_CORE.length} acțiuni lichide multi-bursă (Spania, Germania, Franța, Italia, Olanda, Belgia, Portugalia, Regatul Unit, Elveția și Nordice). Nu prezentăm această listă europeană ca întreaga piață europeană.`:`Motor 1 verifică directorul Nasdaq/NYSE/alte burse SUA plus ${EUROPE_CORE.length} acțiuni lichide din piețele europene. Motor 2 a verificat TOȚI candidații −10%…+1%. Pentru 0…+1% sunt afișate numai activele cu volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Sunt afișate doar activele cu minimum 5 surse pozitive din cele 8 posibile, cel puțin 6 surse active, momentum pozitiv, RSI 40–68 și volum relativ ≥1× (≥1,20× când variația zilnică este pozitivă). Sursele indisponibile nu sunt numărate. Sursele cu cheie API lipsă rămân indisponibile și nu sunt numărate.`});
  }catch(e){return NextResponse.json({ok:false,error:`Acțiuni: ${e.message}`},{status:502});}
 }
