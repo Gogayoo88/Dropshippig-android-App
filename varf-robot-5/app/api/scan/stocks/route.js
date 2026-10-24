@@ -89,7 +89,7 @@ export async function GET(){
   const candidates=quotes.map(q=>{
     const eu=EUROPE_META.get(q.symbol);
     return {sym:q.symbol,price:num(q.regularMarketPrice),daily:num(q.regularMarketChangePercent),volume:num(q.regularMarketVolume),marketState:q.marketState||null,currency:q.currency||null,region:eu?.region||'SUA',exchange:eu?.exchange||'SUA'};
-  }).filter(x=>Number.isFinite(x.price)&&Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=1).sort((a,b)=>b.daily-a.daily);
+  }).filter(x=>Number.isFinite(x.price)&&Number.isFinite(x.daily)&&x.daily>=-15&&x.daily<=1).sort((a,b)=>b.daily-a.daily);
 
   const F=process.env.FINNHUB_API_KEY,T=process.env.TWELVEDATA_API_KEY,A=process.env.ALPHAVANTAGE_API_KEY,M=process.env.MASSIVE_API_KEY||process.env.POLYGON_API_KEY,AK=process.env.ALPACA_API_KEY,AS=process.env.ALPACA_API_SECRET;
   const scanned=await mapLimit(candidates,5,async c=>{
