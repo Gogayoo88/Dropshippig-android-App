@@ -116,7 +116,7 @@ export async function GET() {
 
     scanned.sort((a,b)=>(b.agree-a.agree)||(b.agreePct-a.agreePct)||(b.daily-a.daily));
     const rows=scanned.filter(x=>{
-      const visible=Number(x.agree)>=3 && Number(x.active)>=4 && Number(x.momentum)>0 && Number(x.volRatio)>=1 && Number.isFinite(Number(x.rsi)) && Number(x.rsi)>=40 && Number(x.rsi)<=68;
+      const visible=Number(x.agree)>=5 && Number(x.active)>=6 && Number(x.momentum)>0 && Number(x.volRatio)>=1 && Number.isFinite(Number(x.rsi)) && Number(x.rsi)>=40 && Number(x.rsi)<=68;
       if(!visible) return false;
       if(x.daily<=0) return true;
       // Pe +0…+2% păstrăm numai continuări timpurii cu volum și impuls pozitiv.
