@@ -9,6 +9,7 @@ function Card({x,kind}){const neg=x.daily<0; const strong=x.verdict==='SEMNAL PU
   <div className="metrics"><div><span>Confirmă</span><b>{x.agree}/{x.sourceTarget||x.active}</b></div><div><span>Active</span><b>{x.active}/{x.sourceTarget||x.active}</b></div><div><span>Nu confirmă</span><b>{x.disagree??Math.max(0,x.active-x.agree)}</b></div><div><span>Indisponibile</span><b>{x.unavailable??0}</b></div><div><span>Acord</span><b>{x.agreePct}%</b></div><div><span>RSI</span><b>{fmt(x.rsi,1)}</b></div><div><span>Volum 24h</span><b>{Number.isFinite(Number(x.quoteVolume||x.volume24h))?fmt(Number(x.quoteVolume||x.volume24h)/1000000,2)+'M':'—'}</b></div><div><span>Impuls vol.</span><b>{x.volRatio?fmt(x.volRatio,2)+'×':'—'}</b></div></div>
   <div className="sources">{x.sources?.map(s=><SourcePill s={s} key={s.name}/>)}</div>
   <div className={'verdict '+(strong?'strong':possible?'go':'wait')}>{x.verdict}</div>
+  <div className="note" style={{marginTop:8}}><b>Orizont estimat:</b> {x.horizon||'Orizont neconfirmat'}</div>
 </article>}
 
 export default function Home(){
@@ -17,7 +18,7 @@ export default function Home(){
  async function scanAll(){setLoading(true);setErr('');try{const [a,b]=await Promise.all([fetch('/api/scan/crypto',{cache:'no-store'}).then(r=>r.json()),fetch('/api/scan/stocks',{cache:'no-store'}).then(r=>r.json())]);setMode('all');setData({ok:a.ok||b.ok,kind:'all',asOf:new Date().toISOString(),universe:(a.universe||0)+(b.universe||0),deepScanned:(a.deepScanned||0)+(b.deepScanned||0),rows:[...(a.rows||[]).map(x=>({...x,_kind:'crypto'})),...(b.rows||[]).map(x=>({...x,_kind:'stocks'}))].sort((x,y)=>(y.agree-x.agree)||(y.agreePct-x.agreePct)||(x.daily-y.daily)),note:[a.note,b.note].filter(Boolean).join(' • ')});}catch(e){setErr(e.message)}finally{setLoading(false)}}
  const rows=useMemo(()=>data?.rows||[],[data]);
  return <main>
-  <header><div><h1>VÂRF <span>ROBOT 5</span></h1><p>Scanner multi-sursă • Crypto −10%…+2% • Acțiuni −10%…+1% • pe plus intră doar cu volum puternic</p></div><div className="live"><i></i> DATE LIVE • surse reale • indisponibilele NU se numără</div></header>
+  <header><div><h1>VÂRF <span>ROBOT 5</span></h1><p>Scanner multi-sursă • Crypto −15%…+2% • Acțiuni −15%…+1% • pe plus intră doar cu volum puternic</p></div><div className="live"><i></i> DATE LIVE • surse reale • indisponibilele NU se numără</div></header>
   <section className="robotZone">
    <button className="eye left" onClick={()=>scan('crypto')} aria-label="Scanează crypto"><span>₿</span><small>CRYPTO</small></button>
    <button className={'nose '+(loading?'scanning':'')} onClick={scanAll} aria-label="Scanare totală"><span>SCAN</span><small>{loading?'SCANEZ…':'TOTAL'}</small></button>
