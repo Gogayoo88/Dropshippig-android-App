@@ -92,7 +92,7 @@ export async function GET() {
     const candidates=all.map(t=>{
       const last=num(t.last_price), change=num(t.price_change_24h), prev=last-change, daily=pct(prev,last);
       return {t,last,daily,asset:assetOf(t.symbol)};
-    }).filter(x=>Number.isFinite(x.daily)&&x.daily>=-15&&x.daily<=2&&Number.isFinite(x.last)).sort((a,b)=>b.daily-a.daily);
+    }).filter(x=>Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=1&&Number.isFinite(x.last)).sort((a,b)=>b.daily-a.daily);
 
     let revMom = new Map();
     try { revMom = await revolutRecentMomentum(); } catch { /* source will show unavailable */ }
