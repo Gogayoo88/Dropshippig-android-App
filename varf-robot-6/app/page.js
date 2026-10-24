@@ -1,5 +1,5 @@
 'use client';
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 
 const fmt=(v,d=2)=>Number.isFinite(Number(v))?Number(v).toLocaleString('ro-RO',{maximumFractionDigits:d}):'—';
 function SourcePill({s}){return <span className={'source '+(!s.ok?'off':s.up?'up':'down')} title={s.ok?`Mișcare ${fmt(s.m15)}% • ${s.freshness||'feed'}`:s.error}>{s.name} {s.ok?(s.up?'▲':'▼'):'×'}</span>}
@@ -16,6 +16,21 @@ export default function Home(){
  const [mode,setMode]=useState('crypto'); const [data,setData]=useState(null); const [loading,setLoading]=useState(false); const [err,setErr]=useState('');
  async function scan(which=mode){setLoading(true);setErr('');setMode(which);try{const r=await fetch(`/api/scan/${which}`,{cache:'no-store'});const j=await r.json();if(!j.ok)throw Error(j.error||'Scanare eșuată');setData(j);}catch(e){setErr(e.message)}finally{setLoading(false)}}
  async function scanAll(){setLoading(true);setErr('');try{const [a,b]=await Promise.all([fetch('/api/scan/crypto',{cache:'no-store'}).then(r=>r.json()),fetch('/api/scan/stocks',{cache:'no-store'}).then(r=>r.json())]);setMode('all');setData({ok:a.ok||b.ok,kind:'all',asOf:new Date().toISOString(),universe:(a.universe||0)+(b.universe||0),deepScanned:(a.deepScanned||0)+(b.deepScanned||0),rows:[...(a.rows||[]).map(x=>({...x,_kind:'crypto'})),...(b.rows||[]).map(x=>({...x,_kind:'stocks'}))].sort((x,y)=>(y.agree-x.agree)||(y.agreePct-x.agreePct)||(x.daily-y.daily)),note:[a.note,b.note].filter(Boolean).join(' • ')});}catch(e){setErr(e.message)}finally{setLoading(false)}}
+ // While the stock tab is selected, refresh real quotes automatically every 60 seconds.
+ useEffect(()=>{
+  if(mode!=='stocks') return;
+  let stopped=false;
+  const refresh=async()=>{
+   try{
+    const r=await fetch('/api/scan/stocks',{cache:'no-store'});
+    const j=await r.json();
+    if(!stopped&&j.ok) setData(j);
+    else if(!stopped&&!j.ok) setErr(j.error||'Actualizarea acțiunilor a eșuat');
+   }catch(e){if(!stopped)setErr(e.message||'Datele acțiunilor nu sunt disponibile');}
+  };
+  const timer=setInterval(refresh,60000);
+  return ()=>{stopped=true;clearInterval(timer);};
+ },[mode]);
  const rows=useMemo(()=>data?.rows||[],[data]);
  return <main>
   <header><div><h1>VÂRF <span>ROBOT 6</span></h1><p>Scanner multi-sursă • Crypto −10%…+1% • Acțiuni −10%…+1% • semnal afișat doar la minimum 5 surse pozitive din 8</p></div><div className="live"><i></i> DATE LIVE • surse reale • indisponibilele NU se numără</div></header>
