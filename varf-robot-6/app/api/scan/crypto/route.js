@@ -59,7 +59,7 @@ async function kucoin(asset) {
   const rows=[...(j.data||[])].reverse().slice(-25); const closes=rows.map(x=>num(x[2])), vols=rows.map(x=>num(x[5]));
   return {m15:pct(closes.at(-4),closes.at(-1)),closes,vols};
 }
-async function call(name, fn) { try { const x=await fn(); return {s:source(name,true,x.m15,null,'5m'),x}; } catch(e) { return {s:source(name,false,null,e.message)}; } }
+async function call(name, fn) { try { const x=await fn(); if(!Number.isFinite(x.m15)||!Array.isArray(x.closes)||x.closes.length<4)throw Error('date intraday insuficiente'); return {s:source(name,true,x.m15,null,'5m'),x}; } catch(e) { return {s:source(name,false,null,e.message)}; } }
 
 export async function GET() {
   try {
