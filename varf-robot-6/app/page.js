@@ -25,7 +25,7 @@ export default function Home(){
  useEffect(()=>{
   let stopped=false;
   const refresh=async()=>{
-   try{const r=await fetch('/api/scan/stocks',{cache:'no-store'});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'Scanarea acțiunilor a eșuat');if(!stopped){setData(j);setErr('');}}
+   try{const r=await fetch(endpoint,{cache:'no-store'});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||(mode==='stocks'?'Scanarea acțiunilor a eșuat':'Scanarea criptomonedelor a eșuat'));if(!stopped){setData(j);setErr('');}}
    catch(e){if(!stopped)setErr(e.message||'Datele acțiunilor nu sunt disponibile');}
    finally{if(!stopped)setLoading(false);}
   };
