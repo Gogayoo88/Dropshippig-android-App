@@ -10,32 +10,18 @@ const toDash = s => s.replace('/','-');
 const assetOf = s => s.split(/[\/-]/)[0].toUpperCase();
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 
-async function revolutRecentMomentum() {
-  const end = Date.now(), start = end - 25 * 60_000;
-  let cursor = null, page = 0;
-  const grouped = new Map();
-  do {
-    const qs = new URLSearchParams({ start_date:String(start), end_date:String(end), limit:'1000', region:'EEA' });
-    if (cursor) qs.set('cursor', cursor);
-    const j = await fetchJson(`https://revx.revolut.com/api/1.0/public/trades/all?${qs.toString()}`, {}, 9000);
-    for (const t of (j.data||[])) {
-      const sym = String(t.symbol||'');
-      const p = num(t.price), ts = num(t.timestamp);
-      if (!sym || !Number.isFinite(p) || !Number.isFinite(ts)) continue;
-      if (!grouped.has(sym)) grouped.set(sym, []);
-      grouped.get(sym).push({p,ts});
-    }
-    cursor = j.metadata?.next_cursor || null;
-    page++;
-    if (cursor && page < 4) await sleep(1050);
-  } while (cursor && page < 4);
-
-  const out = new Map();
-  for (const [sym, rows] of grouped) {
-    rows.sort((a,b)=>a.ts-b.ts);
-    if (rows.length >= 2) out.set(sym, pct(rows[0].p, rows.at(-1).p));
-  }
-  return out;
+async function revolutCandles(symbol) {
+  const pair = String(symbol || '').replace('/', '-');
+  if (!/^[A-Z0-9]+-(USD|USDT)$/.test(pair)) throw Error('pereche Revolut X neacceptată');
+  const end = Date.now(), start = end - 60 * 60_000;
+  const qs = new URLSearchParams({ interval:'5', since:String(start), until:String(end), region:'EEA' });
+  const j = await fetchJson(`https://revx.revolut.com/api/1.0/public/candles/${encodeURIComponent(pair)}?${qs.toString()}`, {}, 7000);
+  const rows = [...(j.data || [])].sort((a,b)=>num(a.start)-num(b.start));
+  if (rows.length < 4) throw Error('sub 4 lumânări intraday de la Revolut X');
+  const closes = rows.map(x=>num(x.close)).filter(Number.isFinite);
+  const vols = rows.map(x=>num(x.volume)).filter(Number.isFinite);
+  if (closes.length < 4) throw Error('date OHLCV Revolut X incomplete');
+  return {m15:pct(closes.at(-4),closes.at(-1)),closes,vols,asOf:j.metadata?.timestamp||null};
 }
 
 async function binance(asset) {
@@ -94,22 +80,16 @@ export async function GET() {
       return {t,last,daily,asset:assetOf(t.symbol)};
     }).filter(x=>Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=1&&Number.isFinite(x.last)).sort((a,b)=>b.daily-a.daily);
 
-    let revMom = new Map();
-    try { revMom = await revolutRecentMomentum(); } catch { /* source will show unavailable */ }
-
     const scanned=await mapLimit(candidates,4,async c=>{
-      const revM15 = revMom.get(c.t.symbol) ?? revMom.get(toDash(c.t.symbol)) ?? null;
+      const revResult = await call('Revolut X',()=>revolutCandles(c.t.symbol));
       const external=await Promise.all([
         call('Binance',()=>binance(c.asset)), call('Coinbase',()=>coinbase(c.asset)), call('Kraken',()=>kraken(c.asset)),
         call('OKX',()=>okx(c.asset)), call('Bybit',()=>bybit(c.asset)), call('Bitstamp',()=>bitstamp(c.asset)), call('KuCoin',()=>kucoin(c.asset))
       ]);
-      const jobs=[
-        {s:Number.isFinite(revM15)?source('Revolut X',true,revM15,null,'tranzacții ~25m'):source('Revolut X',false,null,'fără suficiente tranzacții recente')},
-        ...external.map(x=>x)
-      ];
+      const jobs=[revResult,...external];
       const sources=jobs.map(x=>x.s);
-      const best=external.find(x=>x.x?.closes?.length>=15)?.x;
-      const m=[...(Number.isFinite(revM15)?[revM15]:[]),...external.filter(x=>Number.isFinite(x.x?.m15)).map(x=>x.x.m15)];
+      const best=[revResult,...external].find(x=>x.x?.closes?.length>=15)?.x;
+      const m=[...jobs.filter(x=>Number.isFinite(x.x?.m15)).map(x=>x.x.m15)];
       const momentum=m.length?m.reduce((a,b)=>a+b,0)/m.length:0;
       return candidateRow({symbol:c.asset,price:c.last,daily:safePct(c.daily),currency:String(c.t.symbol).split('/')[1],quoteVolume:num(c.t.quote_volume_24h),volume24h:num(c.t.volume_24h)},sources,{rsi:rsi(best?.closes||[]),volRatio:volumeRatio(best?.vols||[]),momentum:safePct(momentum)});
     });
@@ -122,6 +102,11 @@ export async function GET() {
       // Pe +0…+2% păstrăm numai continuări timpurii cu volum și impuls pozitiv.
       return x.daily<=1 && Number(x.volRatio)>=1.20 && Number(x.momentum)>0;
     });
-    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…+1%. Pentru 0…+2% intră în listă numai activele cu impuls de volum ≥1,20×, momentum pozitiv și minimum 5 confirmări. Motor 2 a verificat TOȚI acești candidați; sunt afișați candidații de la 2 confirmări în sus. 2 = URMĂREȘTE, 3–4 = APROAPE DE INTRARE, 5 = INTRARE POSIBILĂ, 6+ = SEMNAL PUTERNIC. Sursele indisponibile nu sunt numărate.`});
+    const providerNames=['Revolut X','Binance','Coinbase','Kraken','OKX','Bybit','Bitstamp','KuCoin'];
+    const providerDiagnostics=providerNames.map(name=>{
+      const statuses=scanned.map(x=>x.sources.find(s=>s.name===name)).filter(Boolean);
+      return {name,checked:statuses.length,ok:statuses.filter(s=>s.ok).length,failed:statuses.filter(s=>!s.ok).length,latestError:statuses.find(s=>!s.ok)?.error||null};
+    });
+    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),quoteSource:'Revolut X public tickers EEA',quoteAsOf:rev.metadata?.timestamp||null,universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,providerDiagnostics,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…+1%. Variația 24h este calculată din prețul curent și schimbarea absolută raportată de Revolut X. Confirmarea de 15 minute folosește lumânări OHLCV publice Revolut X (interval 5m), nu un flux inventat din tranzacții. Celelalte 7 platforme sunt comparatoare independente; perechile nesuportate de o bursă sunt raportate indisponibile, nu simulate. Sursele indisponibile nu sunt numărate.`});
   } catch(e) { return NextResponse.json({ok:false,error:`Crypto: ${e.message}`},{status:502}); }
 }
