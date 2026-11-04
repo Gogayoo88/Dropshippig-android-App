@@ -42,8 +42,15 @@ export async function GET(){
   const revAssets=new Set((revolut?.data||[]).map(x=>String(x.symbol||'').split(/[/-]/)[0].toUpperCase()).filter(Boolean));
   const universe=tickers.filter(t=>tradable.has(t.symbol)&&t.symbol.endsWith('USDT')&&!/^(USDC|BUSD|FDUSD|TUSD|USDP|DAI|EUR|TRY|BRL|GBP|AUD|BIDR|USTC|USDE)USDT$/.test(t.symbol));
   const all=universe.map(t=>({symbol:t.symbol.replace(/USDT$/,''),price:+t.lastPrice,daily:+t.priceChangePercent,quoteVolume:+t.quoteVolume,high:+t.highPrice,low:+t.lowPrice}));
-  // Detectează întâi pe toate perechile Binance; analiza multi-bursă se aplică celor mai promițătoare 60, nu unui interval de randament.
-  const early=all.filter(x=>Number.isFinite(x.daily)&&x.quoteVolume>100000).sort((a,b)=>(b.quoteVolume-a.quoteVolume)).slice(0,60);
+  // Preselectează candidați din întregul univers: scăderile recente și revenirea de lângă minim primesc prioritate, dar monedele deja în urcare rămân eligibile.
+  const ranked=all.filter(x=>Number.isFinite(x.daily)&&x.quoteVolume>50000).map(x=>{
+   const range=Math.max(1e-12,x.high-x.low), position=(x.price-x.low)/range;
+   const earlyScore=(x.daily<0?Math.min(20,Math.abs(x.daily)*1.4):Math.max(0,8-x.daily))+
+    Math.max(0,Math.min(20,(1-position)*20))+
+    Math.min(25,Math.log10(Math.max(1,x.quoteVolume))*2.2)+Math.min(10,Math.log10(Math.max(1,x.high>0?x.quoteVolume/(x.high-x.low):0)));
+   return {...x,earlyScore};
+  }).sort((a,b)=>b.earlyScore-a.earlyScore);
+  const early=ranked.slice(0,60);
   const detailed=await mapLimit(early,4,async coin=>{
    const checks=await Promise.all(providers.map(async ([name,fn])=>{try{const s=await fn(coin.symbol);return {s:source(name,true,s),stats:s};}catch(e){return {s:source(name,false,null,e.message),stats:null};}}));
    const bin=checks[0].stats;
@@ -57,11 +64,11 @@ export async function GET(){
    const agreePct=valid.length?Math.round(100*agree/valid.length):0;
    const risk= (rsiValue>=76?'RSI supraîncălzit': '') + (flow!=null&&sell>=58?' vânzări dominante':'') + (bin.m15< -1.2?' impuls descendent':'');
    const dump=(sell!=null&&sell>=58)||(bin.m15< -1.5&&volRatio>1.8)||(rsiValue>82&&bin.m15<0);
-   const verdict=dump?'AVERTISMENT VÂNZARE':agree>=6&&f.score>=70?'URCARE CONFIRMATĂ':agree>=4&&f.score>=48?'POSIBILĂ URCARE':'ÎN MONITORIZARE';
+   const verdict=dump?'AVERTISMENT VÂNZARE':agree>=6&&f.score>=70?'URCARE SOLIDĂ':agree>=3&&f.score>=42?'URCARE SLABĂ / SCURTĂ':'ÎN MONITORIZARE';
    return {...coin,currency:'USDT',sources:checks.map(x=>x.s),active:valid.length,agree,disagree,unavailable:checks.length-valid.length,agreePct,rsi:rsiValue==null?null:safePct(rsiValue),volRatio:volRatio==null?null:safePct(volRatio),buyPct:flow==null?null:safePct(flow),sellPct:sell==null?null:safePct(sell),inflow24h:coin.quoteVolume, m15:safePct(bin.m15),m60:safePct(bin.m60),...f,verdict,risk:risk.trim()||'Fără avertisment major detectat',dump,sourceTarget:providers.length};
   });
   const rows=detailed.sort((a,b)=>(b.dump-a.dump)||(b.score-a.score)||(b.quoteVolume-a.quoteVolume));
   const diagnostics=providers.map(([name])=>({name,ok:rows.filter(x=>x.sources.find(s=>s.name===name)?.ok).length,checked:rows.length}));
-  return NextResponse.json({ok:true,kind:'crypto',primary:'Binance Spot',asOf:new Date().toISOString(),universe:all.length,deepScanned:rows.length,qualified:rows.filter(x=>x.verdict==='URCARE CONFIRMATĂ'||x.verdict==='POSIBILĂ URCARE').length,rows,providerDiagnostics:diagnostics,revolutUniverse:revAssets.size,revolutFeed:!!revolut,note:'Binance furnizează universul și datele primare. Sunt urmărite toate perechile spot USDT tranzacționabile; analiza tehnică și compararea pe 8 burse este detaliată pentru primele 60 după lichiditate. RSI, impuls 5m/1h, volum relativ și fluxul cumpărătorilor sunt calculate din lumânări reale. Estimarea de potențial este un interval statistic, nu promisiune. Avertismentul de vânzare indică presiune detectată, nu execută tranzacții.'});
+  return NextResponse.json({ok:true,kind:'crypto',primary:'Binance Spot',asOf:new Date().toISOString(),universe:all.length,deepScanned:rows.length,qualified:rows.filter(x=>x.verdict==='URCARE SOLIDĂ'||x.verdict==='URCARE SLABĂ / SCURTĂ').length,rows,providerDiagnostics:diagnostics,revolutUniverse:revAssets.size,revolutFeed:!!revolut,note:'Binance furnizează universul primar. Din toate perechile spot USDT tranzacționabile, sunt selectați 60 de candidați pentru verificare tehnică detaliată pe 8 burse, prioritizând scăderile recente, apropierea de minim și activitatea. Nu este încă o verificare multi-bursă completă pentru fiecare pereche. RSI, impuls 5m/1h, volum relativ și fluxul cumpărătorilor sunt calculate din lumânări reale. Estimarea de potențial este un interval statistic, nu promisiune. Avertismentul de vânzare indică presiune detectată, nu execută tranzacții.'});
  }catch(e){return NextResponse.json({ok:false,error:'Binance / scanare: '+e.message},{status:502});}
 }
