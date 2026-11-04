@@ -5,7 +5,7 @@ export const dynamic='force-dynamic';
 export const runtime='nodejs';
 export const maxDuration=60;
 
-const timeout=6500;
+const timeout=3000;
 const providers=[
   ['Binance', async a=>{const j=await fetchJson('https://api.binance.com/api/v3/klines?symbol='+a+'USDT&interval=5m&limit=40',{},timeout);return candleStats(j.map(x=>({c:+x[4],v:+x[7],buy:+x[10]})));}],
   ['OKX', async a=>{const j=await fetchJson('https://www.okx.com/api/v5/market/candles?instId='+a+'-USDT&bar=5m&limit=40',{},timeout);return candleStats((j.data||[]).reverse().map(x=>({c:+x[4],v:+x[6],buy:null})));}],
@@ -52,8 +52,8 @@ export async function GET(){
     Math.min(25,Math.log10(Math.max(1,x.quoteVolume))*2.2)+Math.min(10,Math.log10(Math.max(1,x.high>0?x.quoteVolume/(x.high-x.low):0)));
    return {...x,earlyScore};
   }).sort((a,b)=>b.earlyScore-a.earlyScore);
-  const early=ranked.slice(0,60);
-  const detailed=await mapLimit(early,4,async coin=>{
+  const revolutMatched=revAssets.size?ranked.filter(x=>revAssets.has(x.symbol)):ranked;\n  const early=revolutMatched;
+  const detailed=await mapLimit(early,20,async coin=>{
    const checks=await Promise.all(providers.map(async ([name,fn])=>{try{const s=await fn(coin.symbol);return {s:source(name,true,s),stats:s};}catch(e){return {s:source(name,false,null,e.message),stats:null};}}));
    const bin=checks[0].stats;
    if(!bin)return {...coin,sources:checks.map(x=>x.s),active:checks.filter(x=>x.stats).length,agree:0,disagree:0,unavailable:checks.length,score:0,verdict:'DATE INSUFICIENTE'};
@@ -69,8 +69,10 @@ export async function GET(){
    const verdict=dump?'AVERTISMENT VÂNZARE':agree>=6&&f.score>=70?'URCARE SOLIDĂ':agree>=3&&f.score>=42?'URCARE SLABĂ / SCURTĂ':'ÎN MONITORIZARE';
    return {...coin,currency:'USDT',sources:checks.map(x=>x.s),active:valid.length,agree,disagree,unavailable:checks.length-valid.length,agreePct,rsi:rsiValue==null?null:safePct(rsiValue),volRatio:volRatio==null?null:safePct(volRatio),buyPct:flow==null?null:safePct(flow),sellPct:sell==null?null:safePct(sell),inflow24h:coin.quoteVolume, m15:safePct(bin.m15),m60:safePct(bin.m60),...f,verdict,risk:risk.trim()||'Fără avertisment major detectat',dump,sourceTarget:providers.length,buyFlowSource:'Binance taker-buy quote volume'};
   });
-  const rows=detailed.sort((a,b)=>(b.dump-a.dump)||(b.score-a.score)||(b.quoteVolume-a.quoteVolume));
-  const diagnostics=providers.map(([name])=>({name,ok:rows.filter(x=>x.sources.find(s=>s.name===name)?.ok).length,checked:rows.length}));
-  return NextResponse.json({ok:true,kind:'crypto',primary:'Binance Spot',asOf:new Date().toISOString(),universe:all.length,deepScanned:rows.length,qualified:rows.filter(x=>x.verdict==='URCARE SOLIDĂ'||x.verdict==='URCARE SLABĂ / SCURTĂ').length,rows,providerDiagnostics:diagnostics,revolutUniverse:revAssets.size,revolutFeed:!!revolut,note:'Binance furnizează universul primar. Din toate perechile spot USDT tranzacționabile, sunt selectați 60 de candidați pentru verificare tehnică detaliată pe 10 burse, prioritizând scăderile recente, apropierea de minim și activitatea. Nu este încă o verificare multi-bursă completă pentru fiecare pereche. RSI, impuls 5m/1h, volum relativ și fluxul cumpărătorilor este măsurat din volumul taker-buy publicat de Binance; celelalte burse confirmă direcția și volumul, dar nu sunt contorizate ca flux buy/sell dacă nu publică acel câmp. Estimarea de potențial este un interval statistic, nu promisiune. Avertismentul de vânzare indică presiune detectată, nu execută tranzacții.'});
+  const scannedRows=detailed.sort((a,b)=>(b.dump-a.dump)||(b.agree-a.agree)||(b.score-a.score)||(b.quoteVolume-a.quoteVolume));
+  // Afișează toate monedele cu cel puțin două confirmări reale sau avertisment de vânzare.
+  const rows=scannedRows.filter(x=>x.agree>=2||x.dump);
+  const diagnostics=providers.map(([name])=>({name,ok:rows.filter(x=>x.sources.find(s=>s.name===name)?.ok).length,checked:scannedRows.length}));
+  return NextResponse.json({ok:true,kind:'crypto',primary:'Binance Spot',asOf:new Date().toISOString(),universe:all.length,deepScanned:scannedRows.length,qualified:rows.filter(x=>x.verdict==='URCARE SOLIDĂ'||x.verdict==='URCARE SLABĂ / SCURTĂ').length,rows,providerDiagnostics:diagnostics,revolutUniverse:revAssets.size,revolutFeed:!!revolut,universeSource:revAssets.size?'Revolut X public feed ∩ Binance USDT':'Binance USDT fallback (Revolut X feed unavailable/empty)',displayed:rows.length,scanned:scannedRows.length,note:'Scannerul verifică fiecare activ din universul Revolut X identificat în feed-ul public (dacă feed-ul răspunde), intersectat cu perechile Binance USDT disponibile. Dacă feed-ul Revolut X nu răspunde, folosește întregul univers Binance USDT și semnalează acest lucru. Fiecare monedă scanată este verificată pe 10 burse; sunt afișate monedele cu minimum două confirmări reale sau cu avertisment de vânzare. RSI, impuls 5m/1h, volum relativ și fluxul cumpărătorilor este măsurat din volumul taker-buy publicat de Binance; celelalte burse confirmă direcția și volumul, dar nu sunt contorizate ca flux buy/sell dacă nu publică acel câmp. Estimarea de potențial este un interval statistic, nu promisiune. Avertismentul de vânzare indică presiune detectată, nu execută tranzacții.'});
  }catch(e){return NextResponse.json({ok:false,error:'Binance / scanare: '+e.message},{status:502});}
 }
