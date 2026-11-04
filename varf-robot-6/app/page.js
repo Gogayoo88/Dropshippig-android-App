@@ -35,14 +35,14 @@ export default function Home(){
  },[mode]);
  const rows=useMemo(()=>data?.rows||[],[data]);
  return <main>
-  <header><div><h1>SCANNER <span>NUMBER ONE</span></h1><p>{mode==='stocks'?'Acțiuni SUA + Europa • caută mișcări timpurii între −15% și +2% • confirmări independente':'Criptomonede disponibile în Revolut X EEA • mișcări timpurii între −15% și +2% • verificare pe 8 surse'}</p></div><div className="live"><i></i> DATE DE PIAȚĂ • surse indisponibile necontorizate</div></header>
+  <header><div><h1>SCANNER <span>NUMBER ONE</span></h1><p>{mode==='stocks'?'Acțiuni SUA + Europa • scanare continuă a mișcărilor și avertismente de risc':'Binance în timp real • detectare timpurie, urmărire până la orice creștere și avertizare de cădere'}</p></div><div className="live"><i></i> DATE DE PIAȚĂ • surse indisponibile necontorizate</div></header>
   <nav className="modeTabs" aria-label="Tipul scannerului">
    <button className={mode==='stocks'?'active':''} onClick={()=>{setData(null);setMode('stocks');setLoading(true);setErr('');}}>ACȚIUNI</button>
    <button className={mode==='crypto'?'active':''} onClick={()=>{setData(null);setMode('crypto');setLoading(true);setErr('');}}>CRYPTO · REVOLUT X</button>
   </nav>
   <section className="robotZone">
    <button className={'nose '+(loading?'scanning':'')} onClick={scan} aria-label={mode==='stocks'?'Scanează acțiuni':'Scanează criptomonede'}><span>{loading?'SCANEZ':'SCANEAZĂ'}</span><small>{mode==='stocks'?'ACȚIUNI':'CRYPTO'}</small></button>
-   <div className="mouth">{mode==='stocks'?'6 surse pentru acțiuni':'8 surse crypto'} • RSI + volum + momentum • fără garanții</div>
+   <div className="mouth">{mode==='stocks'?'6 surse pentru acțiuni':'9 surse crypto'} • RSI + volum + momentum • fără garanții</div>
   </section>
   {err&&<div className="error">{err}</div>}
   {loading&&<div className="empty pulse">Se scanează piața și se verifică sursele…</div>}
