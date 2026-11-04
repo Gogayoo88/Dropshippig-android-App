@@ -20,7 +20,7 @@ function candleStats(rows){
  const valid=rows.filter(x=>Number.isFinite(x.c)&&Number.isFinite(x.v));
  if(valid.length<16)throw Error('istoric 5m insuficient');
  const closes=valid.map(x=>x.c), vols=valid.map(x=>x.v);
- return {m15:pct(closes.at(-4),closes.at(-1)),m60:pct(closes.at(-13),closes.at(-1)),closes,vols,buyQuote:valid.reduce((s,x)=>s+(Number.isFinite(x.buy)?x.buy:0),0),buyAvailable:valid.some(x=>Number.isFinite(x.buy))};
+ return {m15:pct(closes.at(-4),closes.at(-1)),m60:pct(closes.at(-13),closes.at(-1)),closes,vols,buyQuote:valid.slice(-12).reduce((s,x)=>s+(Number.isFinite(x.buy)?x.buy:0),0),buyAvailable:valid.slice(-12).some(x=>Number.isFinite(x.buy)),last12Quote:valid.slice(-12).reduce((s,x)=>s+x.v,0)};
 }
 function source(name,ok,stats,error){
  return {name,ok,up:!!ok&&stats.m15>0.12,m15:ok?safePct(stats.m15):null,error:ok?null:String(error||'indisponibil')};
@@ -50,7 +50,7 @@ export async function GET(){
    if(!bin)return {...coin,sources:checks.map(x=>x.s),active:checks.filter(x=>x.stats).length,agree:0,disagree:0,unavailable:checks.length,score:0,verdict:'DATE INSUFICIENTE'};
    const valid=checks.filter(x=>x.stats), agree=valid.filter(x=>x.stats.m15>0.12).length, disagree=valid.length-agree;
    const rsiValue=rsi(bin.closes), volRatio=volumeRatio(bin.vols);
-   const flow=bin.buyAvailable&&bin.buyQuote>0?Math.min(100,100*bin.buyQuote/(bin.vols.slice(-12).reduce((a,b)=>a+b,0)||1)):null;
+   const flow=bin.buyAvailable&&bin.buyQuote>0?Math.min(100,100*bin.buyQuote/(bin.last12Quote||1)):null;
    const atrPct=100*(coin.high-coin.low)/Math.max(coin.price,1e-12);
    const f=forecast({rsiValue,volRatio,m15:bin.m15,m60:bin.m60,flow:flow??50,atrPct});
    const sell=flow==null?null:100-flow;
