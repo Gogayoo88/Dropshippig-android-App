@@ -78,7 +78,7 @@ export async function GET() {
     const candidates=all.map(t=>{
       const last=num(t.last_price), change=num(t.price_change_24h), prev=last-change, daily=pct(prev,last);
       return {t,last,daily,asset:assetOf(t.symbol)};
-    }).filter(x=>Number.isFinite(x.daily)&&x.daily>=-10&&x.daily<=1&&Number.isFinite(x.last)).sort((a,b)=>b.daily-a.daily);
+    }).filter(x=>Number.isFinite(x.daily)&&x.daily>=-15&&x.daily<=2&&Number.isFinite(x.last)).sort((a,b)=>b.daily-a.daily);
 
     const scanned=await mapLimit(candidates,4,async c=>{
       const revResult = await call('Revolut X',()=>revolutCandles(c.t.symbol));
@@ -107,6 +107,6 @@ export async function GET() {
       const statuses=scanned.map(x=>x.sources.find(s=>s.name===name)).filter(Boolean);
       return {name,checked:statuses.length,ok:statuses.filter(s=>s.ok).length,failed:statuses.filter(s=>!s.ok).length,latestError:statuses.find(s=>!s.ok)?.error||null};
     });
-    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),quoteSource:'Revolut X public tickers EEA',quoteAsOf:rev.metadata?.timestamp||null,universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,providerDiagnostics,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −10%…+1%. Variația 24h este calculată din prețul curent și schimbarea absolută raportată de Revolut X. Confirmarea de 15 minute folosește lumânări OHLCV publice Revolut X (interval 5m), nu un flux inventat din tranzacții. Celelalte 7 platforme sunt comparatoare independente; perechile nesuportate de o bursă sunt raportate indisponibile, nu simulate. Sursele indisponibile nu sunt numărate.`});
+    return NextResponse.json({ok:true,kind:'crypto',asOf:new Date().toISOString(),quoteSource:'Revolut X public tickers EEA',quoteAsOf:rev.metadata?.timestamp||null,universe,deepScanned:candidates.length,qualified:rows.length,rows,watching:scanned.length-rows.length,providerDiagnostics,note:`Motor 1 a verificat toate cele ${universe} active crypto unice disponibile în tickerele publice Revolut X EEA și a găsit ${candidates.length} în intervalul −15%…+2%. Variația 24h este calculată din prețul curent și schimbarea absolută raportată de Revolut X. Confirmarea de 15 minute folosește lumânări OHLCV publice Revolut X (interval 5m), nu un flux inventat din tranzacții. Celelalte 7 platforme sunt comparatoare independente; perechile nesuportate de o bursă sunt raportate indisponibile, nu simulate. Sursele indisponibile nu sunt numărate.`});
   } catch(e) { return NextResponse.json({ok:false,error:`Crypto: ${e.message}`},{status:502}); }
 }
