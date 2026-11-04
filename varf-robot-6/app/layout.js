@@ -2,10 +2,10 @@ import './styles.css';
 import PwaRegister from './pwa-register';
 
 export const metadata = {
-  title: 'Vârf Robot 5',
-  description: 'Scanner crypto și acțiuni cu confirmări multi-sursă',
-  applicationName: 'Vârf Robot',
-  appleWebApp: { capable: true, title: 'Vârf Robot', statusBarStyle: 'black-translucent' }
+  title: 'Scanner Number One',
+  description: 'Scanner crypto multi-bursă cu detectare timpurie, momentum și avertismente de vânzare',
+  applicationName: 'Scanner Number One',
+  appleWebApp: { capable: true, title: 'Scanner Number One', statusBarStyle: 'black-translucent' }
 };
 
 export const viewport = { themeColor: '#07111f', width: 'device-width', initialScale: 1 };
